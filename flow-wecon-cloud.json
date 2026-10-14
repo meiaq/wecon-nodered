@@ -1,0 +1,361 @@
+[
+  {
+    "id": "wkc_tab",
+    "type": "tab",
+    "label": "Monitor Suhu (Cloud)",
+    "disabled": false,
+    "info": "HMI Wecon -> broker.emqx.io -> Node-RED dashboard\nTopik: mi02mekatronika/kit01/data (JSON: ts, d_temp, d_hum)"
+  },
+  {
+    "id": "wkc_c1",
+    "type": "comment",
+    "z": "wkc_tab",
+    "name": "Data dari HMI lewat broker.emqx.io",
+    "info": "",
+    "x": 190,
+    "y": 40,
+    "wires": []
+  },
+  {
+    "id": "wkc_in",
+    "type": "mqtt in",
+    "z": "wkc_tab",
+    "name": "",
+    "topic": "mi02mekatronika/kit01/data",
+    "qos": "0",
+    "datatype": "json",
+    "broker": "wkc_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 170,
+    "y": 120,
+    "wires": [
+      [
+        "wkc_split",
+        "wkc_dbg"
+      ]
+    ]
+  },
+  {
+    "id": "wkc_dbg",
+    "type": "debug",
+    "z": "wkc_tab",
+    "name": "cek payload",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "payload.ts",
+    "statusType": "msg",
+    "x": 430,
+    "y": 80,
+    "wires": []
+  },
+  {
+    "id": "wkc_split",
+    "type": "function",
+    "z": "wkc_tab",
+    "name": "pecah data",
+    "func": "const d = msg.payload || {};\nconst num = v => (typeof v === 'number' && isFinite(v)) ? v : null;\nconst t = num(d.d_temp);\nconst h = num(d.d_hum);\nreturn [\n  t === null ? null : { payload: t },\n  h === null ? null : { payload: h }\n];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 140,
+    "wires": [
+      [
+        "wkc_g_temp"
+      ],
+      [
+        "wkc_g_hum"
+      ]
+    ]
+  },
+  {
+    "id": "wkc_g_temp",
+    "type": "ui-gauge",
+    "z": "wkc_tab",
+    "name": "Temperatur",
+    "group": "wkc_grp",
+    "order": 1,
+    "width": 3,
+    "height": 4,
+    "gtype": "gauge-half",
+    "gstyle": "rounded",
+    "title": "Temperatur",
+    "units": "°C",
+    "icon": "",
+    "prefix": "",
+    "suffix": "",
+    "segments": [
+      {
+        "from": "0",
+        "color": "#3b82f6"
+      },
+      {
+        "from": "25",
+        "color": "#22c55e"
+      },
+      {
+        "from": "35",
+        "color": "#f59e0b"
+      },
+      {
+        "from": "45",
+        "color": "#ef4444"
+      }
+    ],
+    "min": 0,
+    "max": "60",
+    "sizeThickness": 16,
+    "sizeGap": 4,
+    "sizeKeyThickness": 8,
+    "styleRounded": true,
+    "styleGlow": false,
+    "className": "",
+    "x": 630,
+    "y": 120,
+    "wires": []
+  },
+  {
+    "id": "wkc_g_hum",
+    "type": "ui-gauge",
+    "z": "wkc_tab",
+    "name": "Humidity",
+    "group": "wkc_grp",
+    "order": 2,
+    "width": 3,
+    "height": 4,
+    "gtype": "gauge-half",
+    "gstyle": "rounded",
+    "title": "Humidity",
+    "units": "%",
+    "icon": "",
+    "prefix": "",
+    "suffix": "",
+    "segments": [
+      {
+        "from": "0",
+        "color": "#f59e0b"
+      },
+      {
+        "from": "40",
+        "color": "#22c55e"
+      },
+      {
+        "from": "70",
+        "color": "#3b82f6"
+      }
+    ],
+    "min": 0,
+    "max": "100",
+    "sizeThickness": 16,
+    "sizeGap": 4,
+    "sizeKeyThickness": 8,
+    "styleRounded": true,
+    "styleGlow": false,
+    "className": "",
+    "x": 620,
+    "y": 160,
+    "wires": []
+  },
+  {
+    "id": "wkc_c2",
+    "type": "comment",
+    "z": "wkc_tab",
+    "name": "Tes tanpa HMI: klik tombol inject ini",
+    "info": "",
+    "x": 190,
+    "y": 220,
+    "wires": []
+  },
+  {
+    "id": "wkc_sim",
+    "type": "inject",
+    "z": "wkc_tab",
+    "name": "Simulasi HMI",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 140,
+    "y": 260,
+    "wires": [
+      [
+        "wkc_simfn"
+      ]
+    ]
+  },
+  {
+    "id": "wkc_simfn",
+    "type": "function",
+    "z": "wkc_tab",
+    "name": "data palsu",
+    "func": "const r = (a, b) => Math.round((a + Math.random() * (b - a)) * 10) / 10;\nmsg.payload = {\n  ts: new Date().toLocaleString('sv-SE'),\n  d_temp: r(27, 34),\n  d_hum: r(55, 80)\n};\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 330,
+    "y": 260,
+    "wires": [
+      [
+        "wkc_out_sim"
+      ]
+    ]
+  },
+  {
+    "id": "wkc_out_sim",
+    "type": "mqtt out",
+    "z": "wkc_tab",
+    "name": "",
+    "topic": "mi02mekatronika/kit01/data",
+    "qos": "0",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "wkc_broker",
+    "x": 580,
+    "y": 260,
+    "wires": []
+  },
+  {
+    "id": "wkc_broker",
+    "type": "mqtt-broker",
+    "name": "EMQX Publik",
+    "broker": "broker.emqx.io",
+    "port": "1883",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthRetain": "false",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closeRetain": "false",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willRetain": "false",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  },
+  {
+    "id": "wkc_base",
+    "type": "ui-base",
+    "name": "Monitor Suhu",
+    "path": "/dashboard",
+    "appIcon": "",
+    "includeClientData": true,
+    "acceptsClientConfig": [
+      "ui-notification",
+      "ui-control"
+    ],
+    "showPathInSidebar": false,
+    "headerContent": "page",
+    "navigationStyle": "default",
+    "titleBarStyle": "default",
+    "showReconnectNotification": true,
+    "notificationDisplayTime": 1,
+    "showDisconnectNotification": true
+  },
+  {
+    "id": "wkc_theme",
+    "type": "ui-theme",
+    "name": "Navy Mitra",
+    "colors": {
+      "surface": "#16386b",
+      "primary": "#16386b",
+      "bgPage": "#f5f7fb",
+      "groupBg": "#ffffff",
+      "groupOutline": "#dde4ee"
+    },
+    "sizes": {
+      "density": "default",
+      "pagePadding": "12px",
+      "groupGap": "12px",
+      "groupBorderRadius": "12px",
+      "widgetGap": "12px"
+    }
+  },
+  {
+    "id": "wkc_page",
+    "type": "ui-page",
+    "name": "Temperatur Sensor",
+    "ui": "wkc_base",
+    "path": "/suhu",
+    "icon": "thermometer",
+    "layout": "grid",
+    "theme": "wkc_theme",
+    "breakpoints": [
+      {
+        "name": "Default",
+        "px": "0",
+        "cols": "3"
+      },
+      {
+        "name": "Tablet",
+        "px": "576",
+        "cols": "6"
+      },
+      {
+        "name": "Small Desktop",
+        "px": "768",
+        "cols": "9"
+      },
+      {
+        "name": "Desktop",
+        "px": "1024",
+        "cols": "12"
+      }
+    ],
+    "order": 1,
+    "className": "",
+    "visible": "true",
+    "disabled": "false"
+  },
+  {
+    "id": "wkc_grp",
+    "type": "ui-group",
+    "name": "Digital Temperature",
+    "page": "wkc_page",
+    "width": "6",
+    "height": "1",
+    "order": 1,
+    "showTitle": true,
+    "className": "",
+    "visible": "true",
+    "disabled": "false",
+    "groupType": "default"
+  }
+]

@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Monitor Suhu Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: header + status pill di atas, dua kartu meter (Temperatur D0, Humidity D2) berdampingan, turun 1 kolom di HP */
+:root{
+  --bg:#f5f7fb; --surface:#ffffff; --ink:#10203a; --muted:#5b6b85; --line:#dde4ee;
+  --navy:#16386b; --navy-soft:#e6ecf6; --track:#e9eef5;
+  --ok:#1a9e54; --warn:#d98a00; --red:#d61f2b;
+  --sans:'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+  --r-lg:16px; --r-md:12px; --r-pill:999px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b1422; --surface:#111d30; --ink:#e6ecf5; --muted:#9aa9c0; --line:#22324b;
+    --navy:#8db0ec; --navy-soft:#1a2a45; --track:#1c2b42;
+    --ok:#3cc47a; --warn:#f0a72a; --red:#f0525c;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b1422; --surface:#111d30; --ink:#e6ecf5; --muted:#9aa9c0; --line:#22324b;
+  --navy:#8db0ec; --navy-soft:#1a2a45; --track:#1c2b42;
+  --ok:#3cc47a; --warn:#f0a72a; --red:#f0525c;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink); font:500 15px/1.5 var(--sans);
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:max(20px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-bottom, 0px));
+}
+.wrap{max-width:960px; margin:0 auto; display:flex; flex-direction:column; gap:20px}
+.mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+
+/* header */
+.top{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:12px 20px}
+.eyebrow{display:block; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+h1{margin:2px 0 0; font-size:clamp(22px, 4.6vw, 30px); font-weight:800; letter-spacing:-.01em; text-wrap:balance}
+.sub{display:block; margin-top:2px; color:var(--muted); font-size:14px}
+.pills{display:flex; flex-wrap:wrap; gap:8px}
+.pill{
+  display:inline-flex; align-items:center; gap:8px; padding:6px 12px; border-radius:var(--r-pill);
+  border:1px solid var(--line); background:var(--surface); font-size:13px; font-weight:600; color:var(--ink);
+  white-space:nowrap;
+}
+.pill i{width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none}
+.pill[data-state="ok"] i{background:var(--ok); box-shadow:0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent)}
+.pill[data-state="warn"] i{background:var(--warn)}
+.pill[data-state="crit"] i{background:var(--red)}
+.pill[data-state="crit"]{color:var(--red); border-color:color-mix(in srgb, var(--red) 40%, var(--line))}
+
+/* kartu meter: bin-tag di kiri */
+.grid{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px}
+.meter{
+  position:relative; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);
+  padding:20px 22px 18px 26px; display:flex; flex-direction:column; gap:14px; min-width:0;
+}
+.meter::before{content:""; position:absolute; left:0; top:18px; bottom:18px; width:4px; border-radius:0 4px 4px 0; background:var(--navy)}
+.m-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px}
+.m-head h2{margin:0; font-size:15px; font-weight:700; letter-spacing:.02em}
+.tag{font-size:12px; font-weight:700; color:var(--navy); background:var(--navy-soft); padding:2px 8px; border-radius:6px}
+.m-val{display:flex; align-items:baseline; gap:8px; transition:opacity .3s}
+.num{font-size:clamp(54px, 11vw, 88px); font-weight:700; line-height:1; letter-spacing:-.02em}
+.unit{font-size:22px; font-weight:700; color:var(--muted)}
+
+/* skala meteran */
+.scale{position:relative; padding-bottom:22px}
+.track{position:relative; height:10px; border-radius:var(--r-pill); background:var(--track)}
+.fill{position:absolute; inset:0 auto 0 0; width:0; border-radius:inherit; background:var(--navy); transition:width .6s ease}
+.knob{
+  position:absolute; top:50%; left:0; width:18px; height:18px; margin:-9px 0 0 -9px; border-radius:50%;
+  background:var(--surface); border:3px solid var(--navy); transition:left .6s ease;
+}
+.ticks{position:absolute; left:0; right:0; top:16px; height:16px}
+.ticks span{
+  position:absolute; left:var(--p); transform:translateX(-50%);
+  font:500 11px/1 var(--mono); color:var(--muted); padding-top:6px;
+}
+.ticks span::before{content:""; position:absolute; top:0; left:50%; width:1px; height:4px; background:var(--line)}
+.ticks span:first-child{transform:none}
+.ticks span:first-child::before{left:0}
+.ticks span:last-child{transform:translateX(-100%)}
+.ticks span:last-child::before{left:auto; right:0}
+.m-foot{display:flex; gap:16px; font-size:13px; color:var(--muted)}
+.m-foot b{color:var(--ink); font-weight:700}
+
+/* data basi: angka diredupkan */
+body.stale .m-val{opacity:.42}
+body.stale .fill{background:var(--muted)}
+body.stale .knob{border-color:var(--muted)}
+
+.foot{display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px 16px; color:var(--muted); font-size:13px; border-top:1px solid var(--line); padding-top:14px}
+.foot b{color:var(--ink); font-weight:600}
+
+@media (max-width:640px){
+  .grid{grid-template-columns:minmax(0,1fr)}
+  .meter{padding:18px 18px 16px 22px}
+}
+@media (prefers-reduced-motion:reduce){
+  .fill,.knob,.m-val{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <span class="eyebrow">Mekatronika · SMK Mitra Industri 02</span>
+      <h1>Monitor Suhu Trainer</h1>
+      <span class="sub">Wecon Training Kit · Digital Temperature</span>
+    </div>
+    <div class="pills">
+      <span class="pill" id="pBroker" data-state="wait"><i></i><span>Menyambung ke broker…</span></span>
+      <span class="pill" id="pData" data-state="wait"><i></i><span>Menunggu data HMI</span></span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="meter" aria-labelledby="hTemp">
+      <div class="m-head"><h2 id="hTemp">Temperatur</h2><span class="tag mono">D0</span></div>
+      <div class="m-val"><span class="num mono" id="vTemp">--.-</span><span class="unit">°C</span></div>
+      <div class="scale" aria-hidden="true">
+        <div class="track"><div class="fill" id="fTemp"></div><div class="knob" id="kTemp"></div></div>
+        <div class="ticks">
+          <span style="--p:0%">0</span><span style="--p:16.667%">10</span><span style="--p:33.333%">20</span>
+          <span style="--p:50%">30</span><span style="--p:66.667%">40</span><span style="--p:83.333%">50</span><span style="--p:100%">60</span>
+        </div>
+      </div>
+      <div class="m-foot mono"><span>Min <b id="minTemp">--</b></span><span>Maks <b id="maxTemp">--</b></span></div>
+    </section>
+
+    <section class="meter" aria-labelledby="hHum">
+      <div class="m-head"><h2 id="hHum">Humidity</h2><span class="tag mono">D2</span></div>
+      <div class="m-val"><span class="num mono" id="vHum">--.-</span><span class="unit">%</span></div>
+      <div class="scale" aria-hidden="true">
+        <div class="track"><div class="fill" id="fHum"></div><div class="knob" id="kHum"></div></div>
+        <div class="ticks">
+          <span style="--p:0%">0</span><span style="--p:20%">20</span><span style="--p:40%">40</span>
+          <span style="--p:60%">60</span><span style="--p:80%">80</span><span style="--p:100%">100</span>
+        </div>
+      </div>
+      <div class="m-foot mono"><span>Min <b id="minHum">--</b></span><span>Maks <b id="maxHum">--</b></span></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Update terakhir dari HMI: <b class="mono" id="ts">--</b></span>
+    <span>Min/Maks dihitung sejak halaman dibuka</span>
+  </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script>
+// ===== Setting (samain sama script HMI) =====
+var BROKER_URL = 'wss://broker.emqx.io:8084/mqtt';   // MQTT lewat WebSocket aman
+var TOPIC      = 'mi02mekatronika/kit01';            // = TOPIC di mqttkit.lua
+var SCALE      = { Temp: [0, 60], Hum: [0, 100] };   // rentang skala meteran
+
+var $ = function (id) { return document.getElementById(id); };
+var lastAt = 0, hmiOnline = null;
+var stats = { Temp: { min: null, max: null }, Hum: { min: null, max: null } };
+
+function fmt(v) { return (Math.round(v * 10) / 10).toFixed(1); }
+
+function setPill(id, state, text) {
+  var el = $(id);
+  el.dataset.state = state;
+  el.querySelector('span').textContent = text;
+}
+
+function setMeter(key, v) {
+  var lo = SCALE[key][0], hi = SCALE[key][1];
+  var pct = Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100));
+  $('v' + key).textContent = fmt(v);
+  $('f' + key).style.width = pct + '%';
+  $('k' + key).style.left = pct + '%';
+  var s = stats[key];
+  s.min = s.min === null ? v : Math.min(s.min, v);
+  s.max = s.max === null ? v : Math.max(s.max, v);
+  $('min' + key).textContent = fmt(s.min);
+  $('max' + key).textContent = fmt(s.max);
+}
+
+function ageText(sec) {
+  if (sec < 60) return sec + ' dtk';
+  var m = Math.floor(sec / 60);
+  return m < 60 ? m + ' mnt' : Math.floor(m / 60) + ' jam';
+}
+
+// status kesegaran data: live (<=5 dtk), telat (<=30 dtk), putus (>30 dtk)
+function tick() {
+  if (!lastAt) {
+    setPill('pData', hmiOnline === false ? 'crit' : 'wait', hmiOnline === false ? 'HMI offline' : 'Menunggu data HMI');
+    return;
+  }
+  var age = Math.round((Date.now() - lastAt) / 1000);
+  document.body.classList.toggle('stale', age > 5);
+  if (age <= 5) setPill('pData', 'ok', age <= 1 ? 'Live' : 'Live · ' + age + ' dtk lalu');
+  else if (age <= 30) setPill('pData', 'warn', 'Data telat ' + age + ' dtk');
+  else setPill('pData', 'crit', (hmiOnline === false ? 'HMI offline · ' : 'Tidak ada data · ') + ageText(age));
+}
+setInterval(tick, 1000);
+
+function onMessage(topic, payload) {
+  var text = payload.toString();
+  if (topic === TOPIC + '/status') {
+    hmiOnline = text.trim() === 'online';
+    tick();
+    return;
+  }
+  var d;
+  try { d = JSON.parse(text); } catch (e) { return; }
+  if (typeof d.d_temp === 'number') setMeter('Temp', d.d_temp);
+  if (typeof d.d_hum === 'number') setMeter('Hum', d.d_hum);
+  if (d.ts) $('ts').textContent = d.ts;
+  lastAt = Date.now();
+  hmiOnline = true;
+  tick();
+}
+
+if (!window.mqtt) {
+  setPill('pBroker', 'crit', 'Library MQTT gagal dimuat, cek internet');
+} else {
+  var client = mqtt.connect(BROKER_URL, {
+    clientId: 'web-' + Math.random().toString(16).slice(2, 10),
+    clean: true, keepalive: 30, reconnectPeriod: 3000, connectTimeout: 10000
+  });
+  client.on('connect', function () {
+    setPill('pBroker', 'ok', 'Broker tersambung');
+    client.subscribe([TOPIC + '/data', TOPIC + '/status'], { qos: 0 });
+  });
+  client.on('reconnect', function () { setPill('pBroker', 'warn', 'Menyambung ulang…'); });
+  client.on('offline', function () { setPill('pBroker', 'crit', 'Broker terputus'); });
+  client.on('error', function (e) { setPill('pBroker', 'crit', 'Gagal konek broker'); console.warn(e); });
+  client.on('message', onMessage);
+}
+</script>
+</body>
+</html>
